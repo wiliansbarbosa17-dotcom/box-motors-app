@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Manutenção de Motos</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <img src="logos.png" alt="Box Motors Logo" class="logo">
+                <div class="header-info">
+                    <h1>Box Motors</h1>
+                    <p class="tagline">Gerenciador de Manutenção de Motos</p>
+                </div>
+            </div>
+            <p class="subtitle">Sistema inteligente de recorrência para troca de óleo</p>
+        </header>
+
+        <main>
+            <!-- Abas de Navegação -->
+            <div class="tabs">
+                <button class="tab-button active" data-tab="manutencao">
+                    📋 Manutenção
+                </button>
+                <button class="tab-button" data-tab="garantia">
+                    🛡️ Garantias
+                </button>
+            </div>
+
+            <!-- TAB 1: MANUTENÇÃO -->
+            <div id="manutencao-tab" class="tab-content active">
+            <section class="cadastro-section">
+                <h2>Novo Registro de Manutenção</h2>
+                <form id="form-cadastro">
+                    <div class="form-group">
+                        <label for="cliente">Nome do Cliente:</label>
+                        <input type="text" id="cliente" placeholder="Ex: João Silva" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="modelo">Modelo da Moto:</label>
+                        <input type="text" id="modelo" placeholder="Ex: Honda CB 500" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="oleo">Tipo de Óleo:</label>
+                        <input type="text" id="oleo" placeholder="Ex: Mobil 1 5W30" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contato">Contato do Cliente:</label>
+                        <input type="text" id="contato" placeholder="Ex: (11) 98765-4321 ou email@email.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="data-manutencao">Data da Manutenção:</label>
+                        <input type="date" id="data-manutencao" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="dias-recorrencia">Próxima Manutenção em (dias):</label>
+                        <input type="number" id="dias-recorrencia" min="1" value="29" required>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Cadastrar Manutenção</button>
+                </form>
+            </section>
+
+            <!-- Seção de Alertas -->
+            <section class="alertas-section">
+                <h2>🔴 Manutenções Vencidas</h2>
+                <div id="alertas-container">
+                    <p>Nenhuma manutenção vencida</p>
+                </div>
+            </section>
+
+            <!-- Seção de Registros -->
+            <section class="registros-section">
+                <h2>📋 Registros de Manutenção</h2>
+                <div id="registros-container">
+                    <p>Nenhum registro cadastrado</p>
+                </div>
+            </section>
+            </div>
+
+            <!-- TAB 2: GARANTIAS -->
+            <div id="garantia-tab" class="tab-content">
+                <section class="cadastro-section">
+                    <h2>Nova Garantia de Serviço</h2>
+                    <form id="form-garantia">
+                        <div class="form-group">
+                            <label for="garantia-cliente">Nome do Cliente:</label>
+                            <input type="text" id="garantia-cliente" placeholder="Ex: João Silva" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="garantia-servico">Tipo de Serviço:</label>
+                            <select id="garantia-servico" required>
+                                <option value="">Selecione um serviço</option>
+                                <option value="Troca de Óleo">Troca de Óleo</option>
+                                <option value="Revisão Completa">Revisão Completa</option>
+                                <option value="Reparo de Motor">Reparo de Motor</option>
+                                <option value="Freios">Freios</option>
+                                <option value="Pneus">Pneus</option>
+                                <option value="Corrente">Corrente</option>
+                                <option value="Embraiagem">Embraiagem</option>
+                                <option value="Suspensão">Suspensão</option>
+                                <option value="Eletrônico">Reparo Eletrônico</option>
+                                <option value="Outro">Outro</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="garantia-descricao">Descrição do Serviço:</label>
+                            <textarea id="garantia-descricao" placeholder="Detalhes adicionais do serviço" rows="3"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="garantia-valor">Valor do Serviço (R$):</label>
+                            <input type="number" id="garantia-valor" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="garantia-data">Data do Serviço:</label>
+                            <input type="date" id="garantia-data" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="garantia-meses">Duração da Garantia (meses):</label>
+                            <select id="garantia-meses" required>
+                                <option value="1">1 mês</option>
+                                <option value="3" selected>3 meses</option>
+                                <option value="6">6 meses</option>
+                                <option value="12">12 meses</option>
+                                <option value="24">2 anos</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="garantia-telefone">Telefone do Cliente:</label>
+                            <input type="text" id="garantia-telefone" placeholder="(11) 98765-4321">
+                        </div>
+
+
+
+                        <button type="submit" class="btn-primary">Adicionar Garantia</button>
+                    </form>
+                </section>
+
+                <!-- Seção de Garantias Ativas -->
+                <section class="alertas-section">
+                    <h2>✅ Garantias Ativas</h2>
+                    <div id="garantias-ativas-container">
+                        <p>Nenhuma garantia ativa</p>
+                    </div>
+                </section>
+
+                <!-- Seção de Todas as Garantias -->
+                <section class="registros-section">
+                    <h2>🛡️ Todas as Garantias</h2>
+                    <div id="garantias-container">
+                        <p>Nenhuma garantia cadastrada</p>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 - Box Motors | Serviços Especializados em Manutenção</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
