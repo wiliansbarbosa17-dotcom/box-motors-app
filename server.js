@@ -5,6 +5,15 @@ import { createClient } from "@supabase/supabase-js";
 const app = express();
 app.use(cors());
 app.use(express.json());
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// SERVIR FRONTEND
+app.use(express.static(path.join(__dirname, "public")));
+
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
