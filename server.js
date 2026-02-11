@@ -20,11 +20,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// TESTE
-app.get("/", (req, res) => {
-  res.send("API Box Motors + Supabase OK");
-});
-
 // GET todos
 app.get("/api/registros", async (req, res) => {
   const { data, error } = await supabase
