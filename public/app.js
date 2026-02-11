@@ -1,5 +1,5 @@
 // API Base URL
-const API_URL = 'http://localhost:3000/api';
+const API_URL = '/api';
 
 // Tabs
 const tabButtons = document.querySelectorAll('.tab-button');
@@ -11,8 +11,8 @@ const clienteInput = document.getElementById('cliente');
 const modeloInput = document.getElementById('modelo');
 const oleoInput = document.getElementById('oleo');
 const contatoInput = document.getElementById('contato');
-const dataManutencaoInput = document.getElementById('data-manutencao');
-const diasRecorrenciaInput = document.getElementById('dias-recorrencia');
+const data_manutencaoInput = document.getElementById('data-manutencao');
+const diasInput = document.getElementById('dias-recorrencia');
 const alertasContainer = document.getElementById('alertas-container');
 const registrosContainer = document.getElementById('registros-container');
 
@@ -50,7 +50,7 @@ function mudarAba(tabName) {
 // UTILIDADES
 function configurarDataHoje() {
     const hoje = new Date().toISOString().split('T')[0];
-    dataManutencaoInput.value = hoje;
+    data_manutencaoInput.value = hoje;
     garantiaDataInput.value = hoje;
 }
 
@@ -59,16 +59,16 @@ function formatarData(data) {
     return new Date(data).toLocaleDateString('pt-BR', opcoes);
 }
 
-function calcularDiasVencimento(proximaData) {
+function calcularDiasVencimento(proxima_manutencao) {
     const hoje = new Date();
-    const dataProxima = new Date(proximaData);
+    const dataProxima = new Date(proxima_manutencao);
     const diff = hoje - dataProxima;
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-function obterStatusRegistro(proximaData) {
+function obterStatusRegistro(proxima_manutencao) {
     const hoje = new Date();
-    const dataProxima = new Date(proximaData);
+    const dataProxima = new Date(proxima_manutencao);
     const diff = dataProxima - hoje;
     const diasFaltando = Math.ceil(diff / (1000 * 60 * 60 * 24));
     if (diasFaltando < 0) return 'vencido';
@@ -106,7 +106,7 @@ function exibirAlertas(pendentes) {
     }
     let html = '';
     pendentes.forEach(registro => {
-        const diasVencido = calcularDiasVencimento(registro.proximaData);
+        const diasVencido = calcularDiasVencimento(registro.proxima_manutencao);
         html += `
             <div class="alerta-item critico">
                 <h3>🚨 ${registro.cliente}</h3>
@@ -115,7 +115,7 @@ function exibirAlertas(pendentes) {
                 <p><strong>Óleo:</strong> ${registro.oleo}</p>
                 <div class="alerta-info">
                     <div><strong>Vencida há:</strong> ${diasVencido > 1 ? diasVencido + ' dias' : 'HOJE'}</div>
-                    <div><strong>Data prevista:</strong> ${formatarData(registro.proximaData)}</div>
+                    <div><strong>Data prevista:</strong> ${formatarData(registro.proxima_manutencao)}</div>
                 </div>
                 <button class="btn-marcar-feito" onclick="marcarComoFeito(${registro.id})">✓ Manutenção Realizada</button>
             </div>
@@ -131,7 +131,7 @@ function exibirRegistros(registros) {
     }
     let html = '';
     registros.forEach(registro => {
-        const status = obterStatusRegistro(registro.proximaData);
+        const status = obterStatusRegistro(registro.proxima_manutencao);
         html += `
             <div class="registro-card">
                 <div class="registro-header">
@@ -155,15 +155,15 @@ function exibirRegistros(registros) {
                     </div>
                     <div class="detalhe-item">
                         <span class="detalhe-label">Recorrência</span>
-                        <span class="detalhe-valor">A cada ${registro.diasRecorrencia} dias</span>
+                        <span class="detalhe-valor">A cada ${registro.dias} dias</span>
                     </div>
                     <div class="detalhe-item">
                         <span class="detalhe-label">Última Manutenção</span>
-                        <span class="detalhe-valor">${formatarData(registro.dataManutencao)}</span>
+                        <span class="detalhe-valor">${formatarData(registro.data_manutencao)}</span>
                     </div>
                     <div class="detalhe-item">
                         <span class="detalhe-label">Próxima Prevista</span>
-                        <span class="detalhe-valor">${formatarData(registro.proximaData)}</span>
+                        <span class="detalhe-valor">${formatarData(registro.proxima_manutencao)}</span>
                     </div>
                 </div>
                 <div class="registro-acoes">
@@ -179,13 +179,13 @@ function exibirRegistros(registros) {
 async function cadastrarManutencao(event) {
     event.preventDefault();
     const dados = {
-        cliente: clienteInput.value.trim(),
-        modelo: modeloInput.value.trim(),
-        oleo: oleoInput.value.trim(),
-        contato: contatoInput.value.trim(),
-        dataManutencao: dataManutencaoInput.value,
-        diasRecorrencia: diasRecorrenciaInput.value
-    };
+    cliente: clienteInput.value.trim(),
+    modelo: modeloInput.value.trim(),
+    oleo: oleoInput.value.trim(),
+    contato: contatoInput.value.trim(),
+    data_manutencao: data_manutencaoInput.value,
+    dias: Number(diasInput.value)
+};
     if (!dados.cliente || !dados.modelo || !dados.oleo || !dados.contato) {
         alert('Preencha todos os campos obrigatórios!');
         return;
