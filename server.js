@@ -211,9 +211,6 @@ app.delete("/api/garantias/:id", async (req, res) => {
   res.json({ success: true });
 });
 
-// PDF simples
-import QRCode from "qrcode"; // <-- no topo do arquivo (junto com os imports)
-
 app.get("/api/garantias/:id/pdf", async (req, res) => {
   const { id } = req.params;
 
@@ -229,7 +226,8 @@ app.get("/api/garantias/:id/pdf", async (req, res) => {
   const g = garantiaToFront ? garantiaToFront(data) : data;
 
   // Link para validação (você pode criar uma página depois; por enquanto é só URL)
-  const validationUrl = `https://box-motors-app.onrender.com/?garantia=${id}`;
+const baseUrl = process.env.PUBLIC_BASE_URL || "http://localhost:3000";
+const validationUrl = `${baseUrl}/?garantia=${id}`;
 
   // QR Code (DataURL)
   const qrDataUrl = await QRCode.toDataURL(validationUrl, { margin: 1, scale: 6 });
