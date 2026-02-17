@@ -1,3 +1,5 @@
+import QRCode from "qrcode";
+import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
@@ -210,6 +212,8 @@ app.delete("/api/garantias/:id", async (req, res) => {
 });
 
 // PDF simples
+import QRCode from "qrcode"; // <-- no topo do arquivo (junto com os imports)
+
 app.get("/api/garantias/:id/pdf", async (req, res) => {
   const { id } = req.params;
 
@@ -219,33 +223,128 @@ app.get("/api/garantias/:id/pdf", async (req, res) => {
     .eq("id", id)
     .single();
 
-  if (error) return jsonError(res, 404, "Garantia não encontrada", error);
+  if (error) return res.status(404).json({ erro: "Garantia não encontrada", details: error });
 
-  const g = garantiaToFront(data);
+  // adapte aqui se você já usa a função garantiaToFront
+  const g = garantiaToFront ? garantiaToFront(data) : data;
+
+  // Link para validação (você pode criar uma página depois; por enquanto é só URL)
+  const validationUrl = `https://box-motors-app.onrender.com/?garantia=${id}`;
+
+  // QR Code (DataURL)
+  const qrDataUrl = await QRCode.toDataURL(validationUrl, { margin: 1, scale: 6 });
+  const qrBase64 = qrDataUrl.split(",")[1];
+  const qrBuffer = Buffer.from(qrBase64, "base64");
 
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="Garantia_${id}.pdf"`);
+  res.setHeader("Content-Disposition", `attachment; filename="Garantia_BoxMotors_${id}.pdf"`);
 
-  const doc = new PDFDocument({ margin: 40 });
+  const doc = new PDFDocument({ size: "A4", margin: 40 });
   doc.pipe(res);
 
-  doc.fontSize(18).text("Box Motors - Garantia", { align: "center" });
-  doc.moveDown();
+  // ====== HEADER ======
+  doc
+    .fontSize(20)
+    .text("BOX MOTORS", { align: "left" })
+    .moveDown(0.2);
 
-  doc.fontSize(12).text(`Cliente: ${g.cliente}`);
-  doc.text(`Serviço: ${g.servico}`);
-  doc.text(`Descrição: ${g.descricaoServico || "—"}`);
-  doc.text(`Valor: R$ ${Number(g.valor).toFixed(2)}`);
-  doc.text(`Data do Serviço: ${g.dataServico}`);
-  doc.text(`Duração: ${g.mesesGarantia} mês(es)`);
-  doc.text(`Vencimento: ${g.dataVencimento}`);
-  doc.text(`Telefone: ${g.telefone || "—"}`);
+  doc
+    .fontSize(11)
+    .text("Serviços Especializados em Manutenção", { align: "left" })
+    .text("WhatsApp: (69) 99314-4190  |  Instagram: @box_motors", { align: "left" })
+    .moveDown(1);
 
-  doc.moveDown();
-  doc.fontSize(10).text("Emitido automaticamente pelo sistema Box Motors.", { align: "center" });
+  // Linha
+  doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+  doc.moveDown(1);
+
+  // ====== TITULO ======
+  doc
+    .fontSize(16)
+    .text("CERTIFICADO DE GARANTIA", { align: "center" })
+    .moveDown(1);
+
+  // ====== BLOCO PRINCIPAL ======
+  const boxTop = doc.y;
+  const boxLeft = 40;
+  const boxWidth = 515;
+  const boxHeight = 210;
+
+  doc
+    .roundedRect(boxLeft, boxTop, boxWidth, boxHeight, 10)
+    .stroke();
+
+  // Coluna esquerda (dados)
+  const leftX = boxLeft + 15;
+  let y = boxTop + 15;
+
+  const money = (v) => `R$ ${Number(v || 0).toFixed(2)}`;
+
+  doc.fontSize(11).text(`Nº da Garantia: ${id}`, leftX, y); y += 18;
+  doc.text(`Cliente: ${g.cliente || "-"}`, leftX, y); y += 18;
+  doc.text(`Telefone: ${g.telefone || "—"}`, leftX, y); y += 18;
+
+  doc.text(`Serviço: ${g.servico || "-"}`, leftX, y); y += 18;
+  doc.text(`Descrição: ${g.descricaoServico || "—"}`, leftX, y); y += 18;
+
+  doc.text(`Valor: ${money(g.valor)}`, leftX, y); y += 18;
+  doc.text(`Data do Serviço: ${g.dataServico || "-"}`, leftX, y); y += 18;
+  doc.text(`Duração: ${g.mesesGarantia || "-"} mês(es)`, leftX, y); y += 18;
+  doc.text(`Vencimento: ${g.dataVencimento || "-"}`, leftX, y); y += 18;
+
+  // Coluna direita (QR)
+  const qrX = boxLeft + boxWidth - 140;
+  const qrY = boxTop + 25;
+
+  doc
+    .fontSize(10)
+    .text("Validar garantia", qrX, qrY - 15, { width: 120, align: "center" });
+
+  doc.image(qrBuffer, qrX, qrY, { width: 120, height: 120 });
+
+  doc
+    .fontSize(8)
+    .text("Escaneie para consultar", qrX, qrY + 125, { width: 120, align: "center" });
+
+  doc.moveDown(1);
+  doc.y = boxTop + boxHeight + 15;
+
+  // ====== TERMOS ======
+  doc.fontSize(12).text("Termos da garantia", { align: "left" }).moveDown(0.4);
+
+  doc.fontSize(10).text(
+`1) A garantia cobre exclusivamente o serviço descrito neste certificado.
+2) Não cobre mau uso, quedas, adaptações, violação de lacres, ou peças não fornecidas/instaladas pela Box Motors.
+3) É obrigatório apresentar este certificado (impresso ou digital) para acionamento.
+4) O prazo conta a partir da data do serviço, até a data de vencimento informada.`,
+    { align: "left" }
+  );
+
+  doc.moveDown(1);
+
+  // ====== ASSINATURAS ======
+  doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+  doc.moveDown(1);
+
+  const signY = doc.y;
+
+  doc.fontSize(10).text("Assinatura do Cliente", 40, signY, { width: 240, align: "center" });
+  doc.moveTo(40, signY + 30).lineTo(280, signY + 30).stroke();
+
+  doc.fontSize(10).text("Assinatura Box Motors", 315, signY, { width: 240, align: "center" });
+  doc.moveTo(315, signY + 30).lineTo(555, signY + 30).stroke();
+
+  doc.moveDown(4);
+
+  // ====== RODAPÉ ======
+  doc
+    .fontSize(8)
+    .text(`Emitido automaticamente em ${new Date().toLocaleString("pt-BR")}`, { align: "center" })
+    .text(`Validação: ${validationUrl}`, { align: "center" });
 
   doc.end();
 });
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Servidor rodando na porta", PORT));
