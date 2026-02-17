@@ -1,6 +1,98 @@
 // API Base URL
 const API_URL = '/api';
 
+// ===== STATUS ONLINE/OFFLINE =====
+let isOnline = navigator.onLine;
+
+function updateStatusIndicator() {
+    const onlineIndicator = document.getElementById('status-online');
+    const offlineIndicator = document.getElementById('status-offline');
+    
+    if (isOnline) {
+        if (onlineIndicator) onlineIndicator.style.display = 'inline-block';
+        if (offlineIndicator) offlineIndicator.style.display = 'none';
+    } else {
+        if (onlineIndicator) onlineIndicator.style.display = 'none';
+        if (offlineIndicator) offlineIndicator.style.display = 'inline-block';
+    }
+}
+
+window.addEventListener('online', () => {
+    isOnline = true;
+    updateStatusIndicator();
+    console.log('✓ Conexão restaurada');
+    sincronizarDadosOffline();
+});
+
+window.addEventListener('offline', () => {
+    isOnline = false;
+    updateStatusIndicator();
+    console.log('✗ Sem conexão - usando dados locais');
+});
+
+// ===== SERVICE WORKER =====
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('Service worker registrado'))
+            .catch(err => console.error('Erro ao registrar SW:', err));
+    });
+}
+
+// ===== SINCRONIZAÇÃO OFFLINE =====
+async function sincronizarDadosOffline() {
+    if (!db) return;
+    
+    try {
+        const queue = await getSyncQueue();
+        
+        for (let item of queue) {
+            try {
+                if (item.action === 'CREATE_REGISTRO') {
+                    await fetch(`${API_URL}/registros`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(item.data)
+                    });
+                } else if (item.action === 'UPDATE_REGISTRO') {
+                    await fetch(`${API_URL}/registros/${item.data.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                } else if (item.action === 'DELETE_REGISTRO') {
+                    await fetch(`${API_URL}/registros/${item.data.id}`, {
+                        method: 'DELETE'
+                    });
+                } else if (item.action === 'CREATE_GARANTIA') {
+                    await fetch(`${API_URL}/garantias`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(item.data)
+                    });
+                } else if (item.action === 'DELETE_GARANTIA') {
+                    await fetch(`${API_URL}/garantias/${item.data.id}`, {
+                        method: 'DELETE'
+                    });
+                }
+                
+                // Remover da fila após sucesso
+                await removeFromSyncQueue(item.id);
+                console.log(`✓ Sincronizado: ${item.action}`);
+            } catch (error) {
+                console.error(`Erro ao sincronizar ${item.action}:`, error);
+                break; // Para na primeira falha
+            }
+        }
+        
+        if (queue.length > 0) {
+            carregarDados();
+            carregarGarantias();
+        }
+    } catch (error) {
+        console.error('Erro na sincronização:', error);
+    }
+}
+
 // Tabs
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabContents = document.querySelectorAll('.tab-content');
@@ -90,12 +182,30 @@ function obterStatusGarantia(dataVencimento) {
 // MANUTENÇÃO
 async function carregarDados() {
     try {
-        const pendentes = await fetch(`${API_URL}/pendentes`).then(r => r.json());
-        exibirAlertas(pendentes);
-        const registros = await fetch(`${API_URL}/registros`).then(r => r.json());
-        exibirRegistros(registros);
+        if (isOnline) {
+            const pendentes = await fetch(`${API_URL}/pendentes`).then(r => r.json());
+            exibirAlertas(pendentes);
+            const registros = await fetch(`${API_URL}/registros`).then(r => r.json());
+            exibirRegistros(registros);
+            
+            // Atualizar cache local
+            registros.forEach(r => saveRegistroLocal(r));
+        } else {
+            // Modo offline - usar dados locais
+            const registros = await getRegistrosLocal();
+            const hoje = new Date().toISOString().slice(0, 10);
+            const pendentes = registros.filter(r => r.proxima_manutencao < hoje);
+            
+            exibirAlertas(pendentes);
+            exibirRegistros(registros);
+        }
     } catch (error) {
         console.error('Erro ao carregar dados:', error);
+        // Fallback para dados offline
+        if (!isOnline) {
+            const registros = await getRegistrosLocal();
+            exibirRegistros(registros);
+        }
     }
 }
 
@@ -179,35 +289,62 @@ function exibirRegistros(registros) {
 async function cadastrarManutencao(event) {
     event.preventDefault();
     const dados = {
-    cliente: clienteInput.value.trim(),
-    modelo: modeloInput.value.trim(),
-    oleo: oleoInput.value.trim(),
-    contato: contatoInput.value.trim(),
-    data_manutencao: data_manutencaoInput.value,
-    dias: Number(diasInput.value)
-};
+        cliente: clienteInput.value.trim(),
+        modelo: modeloInput.value.trim(),
+        oleo: oleoInput.value.trim(),
+        contato: contatoInput.value.trim(),
+        data_manutencao: data_manutencaoInput.value,
+        dias: Number(diasInput.value)
+    };
+    
     if (!dados.cliente || !dados.modelo || !dados.oleo || !dados.contato) {
         alert('Preencha todos os campos obrigatórios!');
         return;
     }
+    
     try {
-        const response = await fetch(`${API_URL}/registros`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dados)
-        });
-        if (response.ok) {
-            alert('✓ Manutenção cadastrada com sucesso!');
+        if (isOnline) {
+            // Online - enviar para servidor
+            const response = await fetch(`${API_URL}/registros`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dados)
+            });
+            
+            if (response.ok) {
+                const resultado = await response.json();
+                await saveRegistroLocal(resultado);
+                alert('✓ Manutenção cadastrada com sucesso!');
+                formCadastro.reset();
+                configurarDataHoje();
+                carregarDados();
+            } else {
+                const erro = await response.json();
+                alert('Erro: ' + erro.erro);
+            }
+        } else {
+            // Offline - salvar localmente e adicionar à fila
+            const proximaISO = new Date(dados.data_manutencao);
+            proximaISO.setDate(proximaISO.getDate() + dados.dias);
+            
+            const registroLocal = {
+                id: Date.now(),
+                ...dados,
+                proxima_manutencao: proximaISO.toISOString().slice(0, 10),
+                _offline: true
+            };
+            
+            await saveRegistroLocal(registroLocal);
+            await addToSyncQueue('CREATE_REGISTRO', dados);
+            
+            alert('✓ Manutenção salva localmente. Será sincronizada quando conectado!');
             formCadastro.reset();
             configurarDataHoje();
             carregarDados();
-        } else {
-            const erro = await response.json();
-            alert('Erro: ' + erro.erro);
         }
     } catch (error) {
         console.error('Erro:', error);
-        alert('Erro ao cadastrar. Verifique se o servidor está rodando.');
+        alert('Erro ao cadastrar manutenção.');
     }
 }
 
@@ -255,12 +392,26 @@ async function marcarComoFeito(id) {
 // GARANTIA
 async function carregarGarantias() {
     try {
-        const garantias = await fetch(`${API_URL}/garantias`).then(r => r.json());
-        const ativas = garantias.filter(g => obterStatusGarantia(g.dataVencimento) !== 'vencida');
-        exibirGarantiasAtivas(ativas);
-        exibirTodasGarantias(garantias);
+        if (isOnline) {
+            const garantias = await fetch(`${API_URL}/garantias`).then(r => r.json());
+            garantias.forEach(g => saveGarantiaLocal(g));
+            const ativas = garantias.filter(g => obterStatusGarantia(g.dataVencimento) !== 'vencida');
+            exibirGarantiasAtivas(ativas);
+            exibirTodasGarantias(garantias);
+        } else {
+            // Modo offline - usar dados locais
+            const garantias = await getGarantiasLocal();
+            const ativas = garantias.filter(g => obterStatusGarantia(g.dataVencimento) !== 'vencida');
+            exibirGarantiasAtivas(ativas);
+            exibirTodasGarantias(garantias);
+        }
     } catch (error) {
         console.error('Erro ao carregar garantias:', error);
+        // Fallback para dados offline
+        if (!isOnline) {
+            const garantias = await getGarantiasLocal();
+            exibirTodasGarantias(garantias);
+        }
     }
 }
 
@@ -361,28 +512,55 @@ async function cadastrarGarantia(event) {
         mesesGarantia: garantiaMesesInput.value,
         telefone: garantiaTelefoneInput.value.trim()
     };
+    
     if (!dados.cliente || !dados.servico || !dados.valor || !dados.dataServico) {
         alert('Preencha todos os campos obrigatórios!');
         return;
     }
+    
     try {
-        const response = await fetch(`${API_URL}/garantias`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dados)
-        });
-        if (response.ok) {
-            alert('✓ Garantia cadastrada com sucesso!');
+        if (isOnline) {
+            // Online - enviar para servidor
+            const response = await fetch(`${API_URL}/garantias`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dados)
+            });
+            
+            if (response.ok) {
+                const resultado = await response.json();
+                await saveGarantiaLocal(resultado);
+                alert('✓ Garantia cadastrada com sucesso!');
+                formGarantia.reset();
+                configurarDataHoje();
+                carregarGarantias();
+            } else {
+                const erro = await response.json();
+                alert('Erro: ' + erro.erro);
+            }
+        } else {
+            // Offline - salvar localmente
+            const venc = new Date(dados.dataServico);
+            venc.setMonth(venc.getMonth() + Number(dados.mesesGarantia));
+            
+            const garantiaLocal = {
+                id: Date.now(),
+                ...dados,
+                dataVencimento: venc.toISOString().slice(0, 10),
+                _offline: true
+            };
+            
+            await saveGarantiaLocal(garantiaLocal);
+            await addToSyncQueue('CREATE_GARANTIA', dados);
+            
+            alert('✓ Garantia salva localmente. Será sincronizada quando conectado!');
             formGarantia.reset();
             configurarDataHoje();
             carregarGarantias();
-        } else {
-            const erro = await response.json();
-            alert('Erro: ' + erro.erro);
         }
     } catch (error) {
         console.error('Erro:', error);
-        alert('Erro ao cadastrar. Verifique se o servidor está rodando.');
+        alert('Erro ao cadastrar garantia.');
     }
 }
 
@@ -432,6 +610,7 @@ formGarantia.addEventListener('submit', cadastrarGarantia);
 
 // INICIALIZAÇÃO
 window.addEventListener('DOMContentLoaded', () => {
+    updateStatusIndicator();
     inicializarAbas();
     configurarDataHoje();
     carregarDados();

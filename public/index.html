@@ -15,6 +15,10 @@
                     <h1>Box Motors</h1>
                     <p class="tagline">Gerenciador de Manutenção de Motos</p>
                 </div>
+                <div class="status-indicator">
+                    <span id="status-online" class="status-badge online">🟢 Online</span>
+                    <span id="status-offline" class="status-badge offline" style="display:none;">🔴 Offline</span>
+                </div>
             </div>
             <p class="subtitle">Sistema inteligente de recorrência para troca de óleo</p>
         </header>
@@ -173,6 +177,7 @@
         </footer>
     </div>
 
+    <script src="db.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
